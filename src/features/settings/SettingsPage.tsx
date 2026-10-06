@@ -3,7 +3,7 @@ import { useProgress } from '../../stores/progress'
 import { Btn, Card } from '../../components/ui'
 import { useAuth } from '../auth/AuthProvider'
 
-export const APP_VERSION = '0.3.0'
+export const APP_VERSION = '0.4.0'
 
 export function SettingsPage() {
   const { settings, setSettings, goalMin, setGoal, resetAll } = useProgress()
@@ -76,6 +76,13 @@ export function SettingsPage() {
         ) : (
           <p className="text-sm opacity-70">Прогресс хранится на этом устройстве. Облачная синхронизация скоро появится.</p>
         )}
+      </Card>
+
+      <Card className="space-y-3">
+        <p className="font-extrabold">Контент</p>
+        <Link to="/review" className="block rounded-2xl border-2 border-b-4 p-3.5 text-center font-extrabold uppercase tracking-wide text-sky dark:border-slate-600">
+          Проверка контента
+        </Link>
       </Card>
 
       <Card className="space-y-3">

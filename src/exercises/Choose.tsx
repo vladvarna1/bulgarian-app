@@ -28,8 +28,14 @@ export function Choose({ ex, onAnswer, locked }: ExerciseProps<ChooseEx>) {
 
   return (
     <div className="space-y-5">
+      {ex.passage && (
+        <div className="flex items-start gap-3 rounded-3xl border-2 bg-slate-50 p-4 dark:border-slate-700 dark:bg-[#1b2a31]">
+          <p className="flex-1 whitespace-pre-line leading-relaxed">{ex.passage}</p>
+          <SpeakBtn text={ex.passage} size="sm" />
+        </div>
+      )}
       <h2 className="text-2xl font-extrabold">
-        {ex.hidePrompt ? ex.prompt : hasGap ? 'Вставьте пропущенное' : ex.speak ? 'Что это значит?' : ex.prompt}
+        {ex.hidePrompt ? ex.prompt : hasGap ? 'Вставьте пропущенное' : ex.passage ? ex.prompt : ex.speak ? 'Что это значит?' : ex.prompt}
       </h2>
       {hasGap && (
         <p className="rounded-3xl bg-slate-100 p-4 text-2xl font-bold leading-relaxed dark:bg-[#1f2c33]">

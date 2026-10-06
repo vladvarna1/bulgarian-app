@@ -4,12 +4,13 @@ import { extraIndex, lessonIndex, units, wordIndex } from '../../content'
 import { TAGS } from '../../content/schema'
 import { buildPractice, extraToExercise, shuffle } from '../../domain/lessonBuilder'
 import type { Exercise } from '../../exercises/types'
-import { today, useProgress } from '../../stores/progress'
+import { currentLessonId, today, useProgress } from '../../stores/progress'
 import { Session } from '../lesson/Session'
 
-export type Mode = 'daily' | 'mistakes' | 'weak' | 'grammar' | 'listen' | 'falseFriends'
+export type Mode = 'warmup' | 'daily' | 'mistakes' | 'weak' | 'grammar' | 'listen' | 'falseFriends'
 
 const MODES: { id: Mode; icon: string; title: string; desc: string; always?: boolean }[] = [
+  { id: 'warmup', icon: '🔥', title: 'Разминка', desc: 'Смесь заданий из пройденных уроков', always: true },
   { id: 'daily', icon: '📅', title: 'Повторение дня', desc: 'Задания, которые пора повторить', always: true },
   { id: 'mistakes', icon: '🩹', title: 'Повторить ошибки', desc: 'Задания, в которых вы ошиблись', always: true },
   { id: 'grammar', icon: '🎯', title: 'Слабые правила', desc: 'Грамматика, где вы чаще ошибаетесь', always: true },
@@ -39,7 +40,10 @@ function useItemPools(): Record<Mode, string[]> {
     )
     const extras = items.filter((id) => extraIndex.has(id))
     const grammar = extras.filter((id) => weakTags.has(extraIndex.get(id)!.extra.tag))
+    const unlocked = [...Object.keys(lessons), ...(currentLessonId(lessons) ? [currentLessonId(lessons)!] : [])]
+    const warmup = unlocked.flatMap((id) => (lessonIndex.get(id)?.lesson.extra ?? []).map((_, i) => `${id}-x${i}`))
     return {
+      warmup,
       daily: items.filter((id) => !stat(id) || stat(id).due <= d),
       mistakes: items.filter((id) => stat(id) && !stat(id).lastOk),
       weak: items.filter((id) => stat(id) && stat(id).bad > 0 && stat(id).box <= 2),

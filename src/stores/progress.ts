@@ -2,15 +2,18 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { localDate } from '../domain/localDate'
 import { proLessonIds } from '../content'
+import type { DayStats } from '../domain/quests'
+import { dueDate, maturity, reviewCard, type StoredCard } from '../domain/srs'
 
 export interface WordStat {
   ok: number
   bad: number
   lastOk: boolean
-  /** Leitner box 0–6 */
+  /** maturity 0–3 derived from the FSRS card (0 new, 1 learning, 2 young, 3 mature) */
   box: number
-  /** YYYY-MM-DD the word is next due */
+  /** YYYY-MM-DD (local) the item is next due */
   due: string
+  card?: StoredCard
 }
 
 export interface Settings {
@@ -41,6 +44,7 @@ interface State {
   lessons: Record<string, { best: number; times: number }>
   words: Record<string, WordStat>
   tags: Record<string, { ok: number; bad: number }>
+  dayStats: Record<string, DayStats>
   perfectLessons: number
   finishOnboarding: (reason: string, goalMin: number) => void
   setGoal: (min: number) => void
@@ -49,15 +53,8 @@ interface State {
   resetAll: () => void
 }
 
-const INTERVALS = [0, 1, 2, 4, 8, 16, 32]
 export const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone
 export const today = () => localDate(new Date(), timeZone())
-
-function addDays(date: string, n: number): string {
-  const d = new Date(date + 'T12:00:00Z')
-  d.setUTCDate(d.getUTCDate() + n)
-  return d.toISOString().slice(0, 10)
-}
 
 const initial = {
   onboarded: false,
@@ -69,6 +66,7 @@ const initial = {
   lessons: {} as State['lessons'],
   words: {} as State['words'],
   tags: {} as State['tags'],
+  dayStats: {} as State['dayStats'],
   perfectLessons: 0,
 }
 
@@ -84,14 +82,15 @@ export const useProgress = create<State>()(
           const d = today()
           const words = { ...st.words }
           for (const { id, ok } of r.words) {
-            const prev = words[id] ?? { ok: 0, bad: 0, lastOk: true, box: 0, due: d }
-            const box = ok ? Math.min(prev.box + 1, 6) : 0
+            const prev = words[id]
+            const card = reviewCard(prev?.card, ok, new Date())
             words[id] = {
-              ok: prev.ok + (ok ? 1 : 0),
-              bad: prev.bad + (ok ? 0 : 1),
+              ok: (prev?.ok ?? 0) + (ok ? 1 : 0),
+              bad: (prev?.bad ?? 0) + (ok ? 0 : 1),
               lastOk: ok,
-              box,
-              due: addDays(d, INTERVALS[box]),
+              box: maturity(card),
+              due: dueDate(card, timeZone()),
+              card,
             }
           }
           const tags = { ...st.tags }
@@ -99,6 +98,7 @@ export const useProgress = create<State>()(
             const prev = tags[tag] ?? { ok: 0, bad: 0 }
             tags[tag] = { ok: prev.ok + (ok ? 1 : 0), bad: prev.bad + (ok ? 0 : 1) }
           }
+          const prevDay = st.dayStats[d] ?? { lessons: 0, perfect: 0, correct: 0 }
           const lessons = { ...st.lessons }
           const accuracy = r.total ? r.firstTryCorrect / r.total : 0
           if (r.lessonId) {
@@ -110,6 +110,14 @@ export const useProgress = create<State>()(
             activity: { ...st.activity, [d]: (st.activity[d] ?? 0) + r.xp },
             words,
             tags,
+            dayStats: {
+              ...st.dayStats,
+              [d]: {
+                lessons: prevDay.lessons + (r.lessonId ? 1 : 0),
+                perfect: prevDay.perfect + (r.lessonId && accuracy === 1 ? 1 : 0),
+                correct: prevDay.correct + r.firstTryCorrect,
+              },
+            },
             lessons,
             perfectLessons: st.perfectLessons + (r.lessonId && accuracy === 1 ? 1 : 0),
           }

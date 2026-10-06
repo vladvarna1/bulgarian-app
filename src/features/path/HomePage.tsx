@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { basicUnits, outline, proUnits } from '../../content'
 import type { Unit } from '../../content/schema'
+import { dailyQuests } from '../../domain/quests'
 import { currentStreak, dailyGoalXp } from '../../domain/xp'
 import { currentLessonId, today, useProgress } from '../../stores/progress'
 import { plural } from '../lesson/Session'
@@ -10,7 +11,7 @@ import { useAuth } from '../auth/AuthProvider'
 const OFFSETS = [0, 38, 58, 38, 0, -38, -58, -38]
 
 export function HomePage() {
-  const { onboarded, lessons, activity, xp, goalMin } = useProgress()
+  const { onboarded, lessons, activity, xp, goalMin, dayStats } = useProgress()
   const { user, enabled } = useAuth()
   const [showBasics, setShowBasics] = useState(false)
   if (!onboarded) return <Navigate to="/welcome" replace />
@@ -19,6 +20,7 @@ export function HomePage() {
   const streak = currentStreak(activity, today())
   const todayXp = activity[today()] ?? 0
   const goalXp = dailyGoalXp(goalMin)
+  const quests = dailyQuests(activity[today()] ?? 0, dayStats[today()])
   const readyOrders = new Set(proUnits.map((u) => u.order))
 
   return (
@@ -44,6 +46,27 @@ export function HomePage() {
           Войдите, чтобы сохранить прогресс на всех устройствах
         </Link>
       )}
+
+      <section aria-label="Задания дня" className="mx-4 mt-4 rounded-3xl border-2 p-4 dark:border-slate-700">
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="font-extrabold">Задания дня</h2>
+          <span className="text-sm font-bold opacity-60">{quests.filter((q) => q.done).length}/3</span>
+        </div>
+        <ul className="space-y-2">
+          {quests.map((q) => (
+            <li key={q.id} className="flex items-center gap-3">
+              <span className="text-xl">{q.done ? '✅' : q.icon}</span>
+              <div className="flex-1">
+                <p className={`text-sm font-bold ${q.done ? 'line-through opacity-60' : ''}`}>{q.title}</p>
+                <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                  <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${(q.progress / q.target) * 100}%` }} />
+                </div>
+              </div>
+              <span className="w-12 text-right text-xs font-bold opacity-60">{q.progress}/{q.target}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       {proUnits.map((unit, ui) => (
         <UnitSection key={unit.id} unit={unit} ui={ui} lessons={lessons} current={current} locking />

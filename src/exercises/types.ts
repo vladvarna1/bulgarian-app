@@ -14,6 +14,7 @@ interface Base {
 export interface ChooseEx extends Base {
   type: 'choose'
   prompt: string
+  passage?: string
   /** text spoken by the speaker button (Bulgarian) */
   speak?: string
   /** hide the written prompt (listening exercise) */

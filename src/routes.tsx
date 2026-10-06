@@ -8,6 +8,7 @@ import { GuidePage } from './features/path/GuidePage'
 import { HomePage } from './features/path/HomePage'
 import { PracticePage, PracticeRun } from './features/practice/PracticePage'
 import { ProfilePage } from './features/profile/ProfilePage'
+import { ReviewPage } from './features/review/ReviewPage'
 import { SettingsPage } from './features/settings/SettingsPage'
 import { useProgress } from './stores/progress'
 
@@ -40,6 +41,7 @@ export const router = createBrowserRouter([
       { path: '/practice/run/:mode', element: <PracticeRun /> },
       { path: '/guide/:unitId', element: <GuidePage /> },
       { path: '/welcome', element: <Welcome /> },
+      { path: '/review', element: <ReviewPage /> },
       { path: '/login', element: <LoginPage /> },
     ],
   },

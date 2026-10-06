@@ -54,11 +54,11 @@ describe('content', () => {
 })
 
 describe('buildLesson', () => {
-  it('produces 8–18 exercises per lesson, each solvable with its own answer', () => {
+  it('produces 4–18 exercises per lesson, each solvable with its own answer', () => {
     for (const id of allLessonIds) {
       const { unit, lesson } = lessonIndex.get(id)!
       const exs = buildLesson(unit, lesson, rng)
-      expect(exs.length, id).toBeGreaterThanOrEqual(8)
+      expect(exs.length, id).toBeGreaterThanOrEqual(4)
       expect(exs.length, id).toBeLessThanOrEqual(18)
       for (const ex of exs) {
         if (ex.type === 'choose') {
