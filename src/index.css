@@ -1,5 +1,7 @@
 @import 'tailwindcss';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-brand: #58cc02;
   --color-brand-dark: #46a302;
@@ -9,7 +11,10 @@
 }
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
+}
+:root.dark {
+  color-scheme: dark;
 }
 
 body {
@@ -17,19 +22,44 @@ body {
   font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
   background: #fff;
   color: var(--color-ink);
-  padding-top: env(safe-area-inset-top);
+  -webkit-tap-highlight-color: transparent;
+}
+.dark body {
+  background: #131f24;
+  color: #e5e5e5;
 }
 
-@media (prefers-color-scheme: dark) {
-  body {
-    background: #131f24;
-    color: #e5e5e5;
-  }
+button,
+[role='radio'] {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: default;
 }
 
 button:focus-visible,
 a:focus-visible,
-input:focus-visible {
+input:focus-visible,
+textarea:focus-visible {
   outline: 3px solid var(--color-sky);
   outline-offset: 2px;
+}
+
+@keyframes confetti-fall {
+  from {
+    transform: translateY(-10vh) rotate(0deg);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(105vh) rotate(360deg);
+    opacity: 0.8;
+  }
+}
+.confetti {
+  animation: confetti-fall linear forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .confetti {
+    display: none;
+  }
 }
