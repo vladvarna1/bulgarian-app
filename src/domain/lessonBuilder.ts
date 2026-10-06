@@ -1,4 +1,5 @@
-import type { Lesson, Unit, Word } from '../content/schema'
+import { extraKey } from '../content'
+import type { Extra, Lesson, Unit, Word } from '../content/schema'
 import type { ChooseEx, Exercise, MatchEx, TilesEx, TypeEx } from '../exercises/types'
 import { normalize } from './text'
 
@@ -171,6 +172,39 @@ export function matchPairs(words: Word[], rng: Rng): MatchEx | null {
   }
 }
 
+/** Turn an authored exercise into a playable one. `key` identifies it for progress tracking. */
+export function extraToExercise(e: Extra, key: string, track: 'basics' | 'pro', rng: Rng = Math.random): Exercise {
+  const base = { id: uid('ex'), kind: e.kind, tag: e.tag, wordIds: [key], explanation: e.explanation }
+  switch (e.type) {
+    case 'choose':
+      return {
+        ...base,
+        type: 'choose',
+        prompt: e.prompt,
+        options: shuffle(e.options, rng),
+        optionsLang: track === 'pro' || e.kind === 'dialogue' ? 'bg' : 'ru',
+        answer: e.answer,
+      }
+    case 'type':
+      return { ...base, type: 'type', prompt: e.prompt, answer: e.answer, accepted: [e.answer, ...e.accepted], targetLang: 'bg' }
+    case 'spot':
+      return { ...base, type: 'spot', sentence: e.sentence, errors: e.errors, fix: e.fix }
+    case 'tiles': {
+      const answerTokens = normalize(e.answer).split(' ')
+      const tiles = shuffle([...answerTokens, ...e.extraTiles.map(normalize)], rng)
+      return {
+        ...base,
+        type: 'tiles',
+        prompt: e.prompt,
+        tiles,
+        answer: e.answer,
+        accepted: [e.answer, ...e.accepted],
+        targetLang: 'bg',
+      }
+    }
+  }
+}
+
 /** Build the exercise list for one lesson (≈ 12–16 exercises). */
 export function buildLesson(unit: Unit, lesson: Lesson, rng: Rng = Math.random): Exercise[] {
   const words = lesson.words.map((id) => unit.words.find((w) => w.id === id)).filter((w): w is Word => Boolean(w))
@@ -204,6 +238,7 @@ export function buildLesson(unit: Unit, lesson: Lesson, rng: Rng = Math.random):
       id: uid('ar'),
       type: 'type',
       kind: 'article',
+      tag: 'article',
       prompt: `Добавьте определённый артикль: «${a.base}» (${a.ru})`,
       answer: a.answer,
       accepted: [a.answer, ...a.alt],
@@ -212,33 +247,7 @@ export function buildLesson(unit: Unit, lesson: Lesson, rng: Rng = Math.random):
       explanation: `${a.base} → ${a.answer}`,
     })
   }
-  for (const e of lesson.extra) {
-    if (e.type === 'choose') {
-      out.push({
-        id: uid('ex'),
-        type: 'choose',
-        kind: e.kind,
-        prompt: e.prompt,
-        options: shuffle(e.options, rng),
-        optionsLang: e.kind === 'dialogue' ? 'bg' : 'ru',
-        answer: e.answer,
-        wordIds: [],
-        explanation: e.explanation,
-      })
-    } else {
-      out.push({
-        id: uid('ex'),
-        type: 'type',
-        kind: e.kind,
-        prompt: e.prompt,
-        answer: e.answer,
-        accepted: [e.answer, ...e.accepted],
-        targetLang: 'bg',
-        wordIds: [],
-        explanation: e.explanation,
-      })
-    }
-  }
+  lesson.extra.forEach((e, i) => out.push(extraToExercise(e, extraKey(lesson.id, i), unit.track, rng)))
 
   // Intro blocks stay in order; later blocks are shuffled lightly so it doesn't feel mechanical.
   const head = out.slice(0, intro.length + (m ? 1 : 0))

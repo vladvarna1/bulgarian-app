@@ -13,11 +13,13 @@ export interface Achievement {
 interface Snapshot {
   lessons: Record<string, { best: number; times: number }>
   words: Record<string, WordStat>
+  tags: Record<string, { ok: number; bad: number }>
   activity: Record<string, number>
   perfectLessons: number
   today: string
 }
 
+/** words with Leitner box ≥ 2 */
 export function learnedWords(words: Record<string, WordStat>): number {
   return Object.values(words).filter((w) => w.box >= 2).length
 }
@@ -29,22 +31,24 @@ export function completedUnits(lessons: Snapshot['lessons']) {
 export function estimateCefr(lessons: Snapshot['lessons']): string {
   const done = completedUnits(lessons)
   if (done.length === 0) return 'A0'
-  const order = ['A1', 'A2', 'B1']
+  const order = ['A1', 'A2', 'B1', 'B2', 'C1']
   return done.map((u) => u.cefr).sort((a, b) => order.indexOf(b) - order.indexOf(a))[0]
 }
 
 export function achievements(s: Snapshot): Achievement[] {
   const streak = currentStreak(s.activity, s.today)
   const lessonsDone = Object.keys(s.lessons).length
-  const learned = learnedWords(s.words)
+  const ruleOk = Object.values(s.tags).reduce((n, t) => n + t.ok, 0)
+  const masteredTag = Object.values(s.tags).some((t) => t.ok >= 10 && t.ok / (t.ok + t.bad) >= 0.9)
   const ffAll = [...wordIndex.values()].filter((w) => w.sim === 'false_friend')
   const ffMastered = ffAll.filter((w) => (s.words[w.id]?.box ?? 0) >= 2).length
   return [
     { id: 'first', icon: '🌱', title: 'Первый шаг', desc: 'Пройдите первый урок', earned: lessonsDone >= 1 },
     { id: 'streak3', icon: '🔥', title: 'Три дня подряд', desc: 'Серия из 3 дней', earned: streak >= 3 },
     { id: 'streak7', icon: '🔥', title: 'Неделя без пропусков', desc: 'Серия из 7 дней', earned: streak >= 7 },
-    { id: 'words25', icon: '📚', title: '25 слов', desc: 'Выучите 25 слов', earned: learned >= 25 },
-    { id: 'words100', icon: '🎓', title: '100 слов', desc: 'Выучите 100 слов', earned: learned >= 100 },
+    { id: 'rules25', icon: '✍️', title: '25 верных ответов', desc: 'Верно ответьте на 25 заданий по грамматике', earned: ruleOk >= 25 },
+    { id: 'rules100', icon: '🎓', title: '100 верных ответов', desc: 'Верно ответьте на 100 заданий по грамматике', earned: ruleOk >= 100 },
+    { id: 'master', icon: '🧠', title: 'Мастер правила', desc: '90% точности в одном правиле (от 10 ответов)', earned: masteredTag },
     { id: 'perfect', icon: '🏆', title: 'Без единой ошибки', desc: 'Пройдите урок идеально', earned: s.perfectLessons >= 1 },
     { id: 'unit', icon: '🏅', title: 'Юнит пройден', desc: 'Завершите все уроки юнита', earned: completedUnits(s.lessons).length >= 1 },
     {

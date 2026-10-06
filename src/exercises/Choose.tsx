@@ -7,6 +7,7 @@ import type { ChooseEx, ExerciseProps } from './types'
 export function Choose({ ex, onAnswer, locked }: ExerciseProps<ChooseEx>) {
   const show = useShow()
   const [picked, setPicked] = useState<string | null>(null)
+  const hasGap = ex.prompt.includes('___')
 
   useEffect(() => {
     if (ex.speak) speak(ex.speak)
@@ -28,8 +29,18 @@ export function Choose({ ex, onAnswer, locked }: ExerciseProps<ChooseEx>) {
   return (
     <div className="space-y-5">
       <h2 className="text-2xl font-extrabold">
-        {ex.hidePrompt ? ex.prompt : ex.speak ? 'Что это значит?' : ex.prompt}
+        {ex.hidePrompt ? ex.prompt : hasGap ? 'Вставьте пропущенное' : ex.speak ? 'Что это значит?' : ex.prompt}
       </h2>
+      {hasGap && (
+        <p className="rounded-3xl bg-slate-100 p-4 text-2xl font-bold leading-relaxed dark:bg-[#1f2c33]">
+          {ex.prompt.split('___').map((part, i, arr) => (
+            <span key={i}>
+              {part}
+              {i < arr.length - 1 && <span className="mx-1 inline-block min-w-[4.5rem] border-b-4 border-sky text-center text-sky">{picked ?? ' '}</span>}
+            </span>
+          ))}
+        </p>
+      )}
       {(ex.speak || ex.emoji) && (
         <div className="flex items-center gap-4 rounded-3xl bg-slate-100 p-4 dark:bg-[#1f2c33]">
           {ex.speak && <SpeakBtn text={ex.speak} size="lg" />}

@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
-import { outline, units } from '../../content'
+import { basicUnits, outline, proUnits } from '../../content'
+import type { Unit } from '../../content/schema'
 import { currentStreak, dailyGoalXp } from '../../domain/xp'
 import { currentLessonId, today, useProgress } from '../../stores/progress'
 import { plural } from '../lesson/Session'
@@ -10,14 +12,14 @@ const OFFSETS = [0, 38, 58, 38, 0, -38, -58, -38]
 export function HomePage() {
   const { onboarded, lessons, activity, xp, goalMin } = useProgress()
   const { user, enabled } = useAuth()
-  const nav = useNavigate()
+  const [showBasics, setShowBasics] = useState(false)
   if (!onboarded) return <Navigate to="/welcome" replace />
 
   const current = currentLessonId(lessons)
   const streak = currentStreak(activity, today())
   const todayXp = activity[today()] ?? 0
   const goalXp = dailyGoalXp(goalMin)
-  const readyOrders = new Set(units.map((u) => u.order))
+  const readyOrders = new Set(proUnits.map((u) => u.order))
 
   return (
     <div className="pb-8">
@@ -43,64 +45,9 @@ export function HomePage() {
         </Link>
       )}
 
-      {units.map((unit, ui) => {
-        const unitLessonsDone = unit.lessons.filter((l) => lessons[l.id]).length
-        return (
-          <section key={unit.id} className="mt-6">
-            <div className="mx-4 flex items-center gap-3 rounded-3xl p-4 text-white shadow-[0_4px_0_rgba(0,0,0,0.2)]" style={{ background: unit.color }}>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-extrabold uppercase tracking-wider opacity-80">
-                  Юнит {unit.order} · {unit.cefr}
-                </p>
-                <h2 className="text-xl font-extrabold leading-tight">{unit.title_ru}</h2>
-                <p className="text-sm opacity-90">{unit.subtitle_ru}</p>
-                <p className="mt-1 text-xs font-bold opacity-80">
-                  {unitLessonsDone}/{unit.lessons.length} уроков
-                </p>
-              </div>
-              <Link
-                to={`/guide/${unit.id}`}
-                className="shrink-0 rounded-2xl border-2 border-b-4 border-white/40 bg-white/20 px-3 py-2 text-sm font-extrabold hover:bg-white/30"
-              >
-                📖 Гид
-              </Link>
-            </div>
-
-            <ol className="mt-10 flex flex-col items-center gap-4">
-              {unit.lessons.map((l, i) => {
-                const done = Boolean(lessons[l.id])
-                const isCurrent = l.id === current
-                const locked = !done && !isCurrent
-                const offset = OFFSETS[(i + ui * 3) % OFFSETS.length]
-                return (
-                  <li key={l.id} style={{ transform: `translateX(${offset}px)` }} className="relative flex flex-col items-center">
-                    {isCurrent && (
-                      <span className="absolute -top-8 animate-bounce rounded-xl border-2 bg-white px-3 py-1 text-sm font-extrabold uppercase text-brand dark:border-slate-600 dark:bg-[#1b2a31]">
-                        Начать
-                      </span>
-                    )}
-                    <button
-                      disabled={locked}
-                      aria-label={`${l.title_ru}${done ? ', пройден' : locked ? ', закрыт' : ''}`}
-                      onClick={() => nav(`/lesson/${l.id}`)}
-                      className={`grid h-[72px] w-[72px] place-items-center rounded-full border-b-8 text-3xl transition active:translate-y-1 active:border-b-4 ${
-                        done
-                          ? 'border-[#c99400] bg-[#ffc800]'
-                          : isCurrent
-                            ? 'border-brand-dark bg-brand ring-4 ring-brand/30'
-                            : 'border-slate-300 bg-slate-200 opacity-80 dark:border-slate-700 dark:bg-slate-600'
-                      }`}
-                    >
-                      <span className={locked ? 'opacity-40 grayscale' : ''}>{done ? '✓' : locked ? '🔒' : l.icon}</span>
-                    </button>
-                    <span className="mt-1 max-w-[9rem] text-center text-xs font-bold opacity-70">{l.title_ru}</span>
-                  </li>
-                )
-              })}
-            </ol>
-          </section>
-        )
-      })}
+      {proUnits.map((unit, ui) => (
+        <UnitSection key={unit.id} unit={unit} ui={ui} lessons={lessons} current={current} locking />
+      ))}
 
       <section className="mx-4 mt-10">
         <h2 className="mb-3 text-lg font-extrabold">Дальше по курсу</h2>
@@ -119,7 +66,97 @@ export function HomePage() {
             ))}
         </ul>
       </section>
+
+      <section className="mx-4 mt-10">
+        <button
+          onClick={() => setShowBasics((s) => !s)}
+          aria-expanded={showBasics}
+          className="flex w-full items-center gap-3 rounded-2xl border-2 p-4 text-left dark:border-slate-700"
+        >
+          <span className="text-2xl">🌱</span>
+          <span className="flex-1">
+            <span className="block font-extrabold">Основы (A1) — для повторения</span>
+            <span className="block text-sm opacity-70">Алфавит, приветствия, «съм», артикль. Все уроки открыты.</span>
+          </span>
+          <span className="text-xl">{showBasics ? '▲' : '▼'}</span>
+        </button>
+      </section>
+      {showBasics && basicUnits.map((unit, ui) => <UnitSection key={unit.id} unit={unit} ui={ui} lessons={lessons} current={null} />)}
     </div>
+  )
+}
+
+function UnitSection({
+  unit,
+  ui,
+  lessons,
+  current,
+  locking = false,
+}: {
+  unit: Unit
+  ui: number
+  lessons: Record<string, unknown>
+  current: string | null
+  locking?: boolean
+}) {
+  const nav = useNavigate()
+  const done = unit.lessons.filter((l) => lessons[l.id]).length
+  return (
+    <section className="mt-6">
+      <div className="mx-4 flex items-center gap-3 rounded-3xl p-4 text-white shadow-[0_4px_0_rgba(0,0,0,0.2)]" style={{ background: unit.color }}>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-extrabold uppercase tracking-wider opacity-80">
+            Юнит {unit.order} · {unit.cefr}
+          </p>
+          <h2 className="text-xl font-extrabold leading-tight">{unit.title_ru}</h2>
+          <p className="text-sm opacity-90">{unit.subtitle_ru}</p>
+          <p className="mt-1 text-xs font-bold opacity-80">
+            {done}/{unit.lessons.length} уроков
+          </p>
+        </div>
+        <Link
+          to={`/guide/${unit.id}`}
+          className="shrink-0 rounded-2xl border-2 border-b-4 border-white/40 bg-white/20 px-3 py-2 text-sm font-extrabold hover:bg-white/30"
+        >
+          📖 Гид
+        </Link>
+      </div>
+
+      <ol className="mt-10 flex flex-col items-center gap-4">
+        {unit.lessons.map((l, i) => {
+          const isDone = Boolean(lessons[l.id])
+          const isCurrent = l.id === current
+          const locked = locking && !isDone && !isCurrent
+          const offset = OFFSETS[(i + ui * 3) % OFFSETS.length]
+          return (
+            <li key={l.id} style={{ transform: `translateX(${offset}px)` }} className="relative flex flex-col items-center">
+              {isCurrent && (
+                <span className="absolute -top-8 animate-bounce rounded-xl border-2 bg-white px-3 py-1 text-sm font-extrabold uppercase text-brand dark:border-slate-600 dark:bg-[#1b2a31]">
+                  Начать
+                </span>
+              )}
+              <button
+                disabled={locked}
+                aria-label={`${l.title_ru}${isDone ? ', пройден' : locked ? ', закрыт' : ''}`}
+                onClick={() => nav(`/lesson/${l.id}`)}
+                className={`grid h-[72px] w-[72px] place-items-center rounded-full border-b-8 text-3xl transition active:translate-y-1 active:border-b-4 ${
+                  isDone
+                    ? 'border-[#c99400] bg-[#ffc800]'
+                    : isCurrent
+                      ? 'border-brand-dark bg-brand ring-4 ring-brand/30'
+                      : locked
+                        ? 'border-slate-300 bg-slate-200 opacity-80 dark:border-slate-700 dark:bg-slate-600'
+                        : 'border-sky-700 bg-sky'
+                }`}
+              >
+                <span className={locked ? 'opacity-40 grayscale' : ''}>{isDone ? '✓' : locked ? '🔒' : l.icon}</span>
+              </button>
+              <span className="mt-1 max-w-[9rem] text-center text-xs font-bold opacity-70">{l.title_ru}</span>
+            </li>
+          )
+        })}
+      </ol>
+    </section>
   )
 }
 

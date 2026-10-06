@@ -7,6 +7,8 @@ interface Base {
   wordIds: string[]
   explanation?: string
   kind?: 'word' | 'sentence' | 'listen' | 'rule' | 'falseFriend' | 'dialogue' | 'article'
+  /** grammar area, used for per-rule accuracy */
+  tag?: string
 }
 
 export interface ChooseEx extends Base {
@@ -54,7 +56,15 @@ export interface MatchEx extends Base {
 }
 
 /** Add a new exercise type: extend this union, add a component + check() and register it in registry.tsx. */
-export type Exercise = ChooseEx | TilesEx | TypeEx | MatchEx
+export interface SpotEx extends Base {
+  type: 'spot'
+  sentence: string
+  /** indexes of the wrong words; empty = the sentence is correct */
+  errors: number[]
+  fix: string
+}
+
+export type Exercise = ChooseEx | TilesEx | TypeEx | MatchEx | SpotEx
 
 export type AnswerValue = string | { mistakes: number; badIds: string[] }
 

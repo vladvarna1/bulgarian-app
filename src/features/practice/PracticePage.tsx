@@ -1,60 +1,105 @@
 import { useMemo } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
-import { lessonIndex, units, wordIndex } from '../../content'
-import type { Word } from '../../content/schema'
-import { buildPractice } from '../../domain/lessonBuilder'
+import { extraIndex, lessonIndex, units, wordIndex } from '../../content'
+import { TAGS } from '../../content/schema'
+import { buildPractice, extraToExercise, shuffle } from '../../domain/lessonBuilder'
+import type { Exercise } from '../../exercises/types'
 import { today, useProgress } from '../../stores/progress'
 import { Session } from '../lesson/Session'
 
-export type Mode = 'daily' | 'mistakes' | 'weak' | 'listen' | 'falseFriends'
+export type Mode = 'daily' | 'mistakes' | 'weak' | 'grammar' | 'listen' | 'falseFriends'
 
-const MODES: { id: Mode; icon: string; title: string; desc: string }[] = [
-  { id: 'daily', icon: '📅', title: 'Повторение дня', desc: 'Слова, которые пора повторить' },
-  { id: 'mistakes', icon: '🩹', title: 'Повторить ошибки', desc: 'Слова, в которых вы ошиблись' },
-  { id: 'weak', icon: '💪', title: 'Слабые слова', desc: 'Слова, которые даются труднее всего' },
-  { id: 'listen', icon: '🎧', title: 'Только аудирование', desc: 'Слушайте и выбирайте или пишите' },
-  { id: 'falseFriends', icon: '⚠️', title: 'Ложные друзья', desc: 'Слова, похожие на русские, но другие' },
+const MODES: { id: Mode; icon: string; title: string; desc: string; always?: boolean }[] = [
+  { id: 'daily', icon: '📅', title: 'Повторение дня', desc: 'Задания, которые пора повторить', always: true },
+  { id: 'mistakes', icon: '🩹', title: 'Повторить ошибки', desc: 'Задания, в которых вы ошиблись', always: true },
+  { id: 'grammar', icon: '🎯', title: 'Слабые правила', desc: 'Грамматика, где вы чаще ошибаетесь', always: true },
+  { id: 'weak', icon: '💪', title: 'Трудные задания', desc: 'То, что даётся труднее всего', always: true },
+  { id: 'listen', icon: '🎧', title: 'Только аудирование', desc: 'Слова из «Основ»: слушайте и пишите' },
+  { id: 'falseFriends', icon: '⚠️', title: 'Ложные друзья', desc: 'Слова из «Основ», похожие на русские' },
 ]
 
-/** Words the learner has met: those in completed lessons plus anything with stats. */
-function useWordPools() {
-  const { lessons, words } = useProgress()
+/** Item ids: word ids and authored-exercise keys share one progress table. */
+function useItemPools(): Record<Mode, string[]> {
+  const { lessons, words, tags } = useProgress()
   return useMemo(() => {
     const seen = new Set(Object.keys(words))
-    for (const id of Object.keys(lessons)) lessonIndex.get(id)?.lesson.words.forEach((w) => seen.add(w))
-    const seenWords = [...seen].map((id) => wordIndex.get(id)).filter((w): w is Word => Boolean(w))
-    const d = today()
-    const pick = (f: (w: Word) => boolean) => seenWords.filter(f)
-    const stat = (w: Word) => words[w.id]
-    const byMode: Record<Mode, Word[]> = {
-      daily: pick((w) => !stat(w) || stat(w)!.due <= d),
-      mistakes: pick((w) => stat(w) && !stat(w)!.lastOk),
-      weak: pick((w) => stat(w) && stat(w)!.bad > 0 && stat(w)!.box <= 2),
-      listen: seenWords,
-      falseFriends: pick((w) => w.sim === 'false_friend'),
+    for (const id of Object.keys(lessons)) {
+      const l = lessonIndex.get(id)
+      if (!l) continue
+      l.lesson.words.forEach((w) => seen.add(w))
+      l.lesson.extra.forEach((_, i) => seen.add(`${id}-x${i}`))
     }
-    return byMode
-  }, [lessons, words])
+    const items = [...seen].filter((id) => wordIndex.has(id) || extraIndex.has(id))
+    const d = today()
+    const stat = (id: string) => words[id]
+    const weakTags = new Set(
+      Object.entries(tags)
+        .filter(([, t]) => t.bad > 0 && t.ok / (t.ok + t.bad) < 0.85)
+        .map(([k]) => k),
+    )
+    const extras = items.filter((id) => extraIndex.has(id))
+    const grammar = extras.filter((id) => weakTags.has(extraIndex.get(id)!.extra.tag))
+    return {
+      daily: items.filter((id) => !stat(id) || stat(id).due <= d),
+      mistakes: items.filter((id) => stat(id) && !stat(id).lastOk),
+      weak: items.filter((id) => stat(id) && stat(id).bad > 0 && stat(id).box <= 2),
+      grammar,
+      listen: items.filter((id) => wordIndex.has(id)),
+      falseFriends: items.filter((id) => wordIndex.get(id)?.sim === 'false_friend'),
+    }
+  }, [lessons, words, tags])
+}
+
+function buildFromItems(ids: string[], mode: Mode): Exercise[] {
+  const picked = shuffle(ids).slice(0, 10)
+  const allWords = units.flatMap((u) => u.words)
+  const out: Exercise[] = []
+  const wordItems = picked.filter((id) => wordIndex.has(id)).map((id) => wordIndex.get(id)!)
+  if (wordItems.length) {
+    out.push(...buildPractice(wordItems, { mode: mode === 'listen' ? 'listen' : mode === 'falseFriends' ? 'falseFriends' : 'mix', pool: allWords }))
+  }
+  for (const id of picked) {
+    const e = extraIndex.get(id)
+    if (e) out.push(extraToExercise(e.extra, id, e.unit.track))
+  }
+  return shuffle(out)
 }
 
 export function PracticePage() {
-  const pools = useWordPools()
+  const pools = useItemPools()
+  const tags = useProgress((s) => s.tags)
   const hasProgress = Object.values(useProgress((s) => s.lessons)).length > 0
+  const weak = Object.entries(tags)
+    .filter(([, t]) => t.ok + t.bad >= 3)
+    .map(([k, t]) => ({ k, acc: t.ok / (t.ok + t.bad) }))
+    .sort((a, b) => a.acc - b.acc)
+    .slice(0, 3)
+
   return (
     <div className="space-y-4 p-4">
       <h1 className="text-3xl font-extrabold">Практика</h1>
       {!hasProgress && (
         <p className="rounded-2xl bg-sky/10 p-4">
-          Пройдите первый урок, и здесь появятся слова для повторения. Ошибки и ложные друзья попадают сюда автоматически.
+          Пройдите первый урок, и здесь появятся задания для повторения. Ошибки автоматически попадают в «Слабые правила».
         </p>
       )}
-      {MODES.map((m) => {
+      {weak.length > 0 && (
+        <div className="rounded-2xl bg-amber-50 p-4 dark:bg-[#3b2a0a]">
+          <p className="font-extrabold">Над чем стоит поработать</p>
+          <ul className="mt-1 text-sm">
+            {weak.map((w) => (
+              <li key={w.k}>
+                • {TAGS[w.k as keyof typeof TAGS] ?? w.k} — {Math.round(w.acc * 100)}% верно
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {MODES.filter((m) => m.always || pools[m.id].length > 0).map((m) => {
         const n = pools[m.id].length
         const disabled = n === 0
         const body = (
-          <div
-            className={`flex items-center gap-4 rounded-3xl border-2 border-b-4 p-4 dark:border-slate-700 ${disabled ? 'opacity-50' : 'active:translate-y-0.5'}`}
-          >
+          <div className={`flex items-center gap-4 rounded-3xl border-2 border-b-4 p-4 dark:border-slate-700 ${disabled ? 'opacity-50' : 'active:translate-y-0.5'}`}>
             <span className="text-4xl">{m.icon}</span>
             <div className="min-w-0 flex-1">
               <p className="text-lg font-extrabold">{m.title}</p>
@@ -78,15 +123,9 @@ export function PracticePage() {
 export function PracticeRun() {
   const { mode } = useParams()
   const nav = useNavigate()
-  const pools = useWordPools()
+  const pools = useItemPools()
   const m = MODES.find((x) => x.id === mode)
-  const exercises = useMemo(() => {
-    if (!m) return []
-    const all = units.flatMap((u) => u.words)
-    return buildPractice(pools[m.id], { mode: m.id === 'listen' ? 'listen' : m.id === 'falseFriends' ? 'falseFriends' : 'mix', pool: all })
-    // build once when the screen opens
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [m?.id])
+  const exercises = useMemo(() => (m ? buildFromItems(pools[m.id], m.id) : []), [m?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!m || exercises.length === 0) return <Navigate to="/practice" replace />
   return <Session exercises={exercises} kind="practice" onExit={() => nav('/practice')} />
 }

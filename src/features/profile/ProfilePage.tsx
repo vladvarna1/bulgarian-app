@@ -1,5 +1,6 @@
 import { units } from '../../content'
-import { achievements, completedUnits, estimateCefr, learnedWords } from '../../domain/achievements'
+import { TAGS } from '../../content/schema'
+import { achievements, completedUnits, estimateCefr } from '../../domain/achievements'
 import { currentStreak, lastDays } from '../../domain/xp'
 import { today, useProgress } from '../../stores/progress'
 import { Card } from '../../components/ui'
@@ -7,13 +8,13 @@ import { Card } from '../../components/ui'
 const DOW = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб']
 
 export function ProfilePage() {
-  const { xp, activity, lessons, words, perfectLessons } = useProgress()
+  const { xp, activity, lessons, words, tags, perfectLessons } = useProgress()
   const t = today()
   const streak = currentStreak(activity, t)
   const week = lastDays(t, 7)
   const max = Math.max(1, ...week.map((d) => activity[d] ?? 0))
   const month = lastDays(t, 28)
-  const ach = achievements({ lessons, words, activity, perfectLessons, today: t })
+  const ach = achievements({ lessons, words, tags, activity, perfectLessons, today: t })
   const cefr = estimateCefr(lessons)
 
   return (
@@ -23,15 +24,40 @@ export function ProfilePage() {
       <div className="grid grid-cols-2 gap-3">
         <Tile icon="🔥" value={streak} label="дней подряд" />
         <Tile icon="⚡" value={xp} label="всего XP" />
-        <Tile icon="📚" value={learnedWords(words)} label="слов выучено" />
+        <Tile icon="🎯" value={Object.values(tags).reduce((n, x) => n + x.ok, 0)} label="верных ответов по грамматике" />
         <Tile icon="🏅" value={`${completedUnits(lessons).length}/${units.length}`} label="юнитов пройдено" />
       </div>
 
       <Card>
         <p className="text-sm font-bold uppercase opacity-60">Оценка уровня</p>
         <p className="text-4xl font-extrabold text-brand">{cefr}</p>
-        <p className="text-sm opacity-70">По шкале A1 → B1. Меняется по мере прохождения юнитов.</p>
+        <p className="text-sm opacity-70">Ориентировочно, по самому высокому полностью пройденному юниту.</p>
       </Card>
+
+      {Object.keys(tags).length > 0 && (
+        <Card>
+          <p className="mb-3 font-extrabold">Точность по правилам</p>
+          <ul className="space-y-3">
+            {Object.entries(tags)
+              .filter(([, v]) => v.ok + v.bad > 0)
+              .sort(([, a], [, b]) => a.ok / (a.ok + a.bad) - b.ok / (b.ok + b.bad))
+              .map(([k, v]) => {
+                const acc = Math.round((v.ok / (v.ok + v.bad)) * 100)
+                return (
+                  <li key={k}>
+                    <div className="mb-1 flex justify-between text-sm font-bold">
+                      <span>{TAGS[k as keyof typeof TAGS] ?? k}</span>
+                      <span className={acc >= 85 ? 'text-brand' : acc >= 60 ? 'text-amber-500' : 'text-danger'}>{acc}% · {v.ok + v.bad}</span>
+                    </div>
+                    <div className="h-2.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                      <div className={`h-full rounded-full ${acc >= 85 ? 'bg-brand' : acc >= 60 ? 'bg-amber-400' : 'bg-danger'}`} style={{ width: `${acc}%` }} />
+                    </div>
+                  </li>
+                )
+              })}
+          </ul>
+        </Card>
+      )}
 
       <Card>
         <p className="mb-3 font-extrabold">XP за неделю</p>

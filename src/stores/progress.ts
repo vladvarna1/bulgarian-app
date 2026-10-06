@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { localDate } from '../domain/localDate'
-import { allLessonIds } from '../content'
+import { proLessonIds } from '../content'
 
 export interface WordStat {
   ok: number
@@ -26,6 +26,8 @@ export interface SessionResult {
   total: number
   seconds: number
   words: { id: string; ok: boolean }[]
+  /** first-attempt result per grammar tag */
+  tags: { tag: string; ok: boolean }[]
 }
 
 interface State {
@@ -38,6 +40,7 @@ interface State {
   activity: Record<string, number>
   lessons: Record<string, { best: number; times: number }>
   words: Record<string, WordStat>
+  tags: Record<string, { ok: number; bad: number }>
   perfectLessons: number
   finishOnboarding: (reason: string, goalMin: number) => void
   setGoal: (min: number) => void
@@ -65,6 +68,7 @@ const initial = {
   activity: {} as Record<string, number>,
   lessons: {} as State['lessons'],
   words: {} as State['words'],
+  tags: {} as State['tags'],
   perfectLessons: 0,
 }
 
@@ -90,6 +94,11 @@ export const useProgress = create<State>()(
               due: addDays(d, INTERVALS[box]),
             }
           }
+          const tags = { ...st.tags }
+          for (const { tag, ok } of r.tags) {
+            const prev = tags[tag] ?? { ok: 0, bad: 0 }
+            tags[tag] = { ok: prev.ok + (ok ? 1 : 0), bad: prev.bad + (ok ? 0 : 1) }
+          }
           const lessons = { ...st.lessons }
           const accuracy = r.total ? r.firstTryCorrect / r.total : 0
           if (r.lessonId) {
@@ -100,6 +109,7 @@ export const useProgress = create<State>()(
             xp: st.xp + r.xp,
             activity: { ...st.activity, [d]: (st.activity[d] ?? 0) + r.xp },
             words,
+            tags,
             lessons,
             perfectLessons: st.perfectLessons + (r.lessonId && accuracy === 1 ? 1 : 0),
           }
@@ -112,5 +122,5 @@ export const useProgress = create<State>()(
 
 /** First lesson not yet completed (the "current" node on the path). */
 export function currentLessonId(lessons: State['lessons']): string | null {
-  return allLessonIds.find((id) => !lessons[id]) ?? null
+  return proLessonIds.find((id) => !lessons[id]) ?? null
 }

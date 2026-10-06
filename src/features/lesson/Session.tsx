@@ -23,6 +23,7 @@ export function Session({ exercises, kind, lessonId, onExit }: Props) {
   const [startedAt] = useState(() => Date.now())
   const firstOk = useRef(0)
   const wordResults = useRef<Map<string, boolean>>(new Map())
+  const tagResults = useRef<{ tag: string; ok: boolean }[]>([])
   const sound = useProgress((s) => s.settings.sound)
   const completeSession = useProgress((s) => s.completeSession)
   const total = exercises.length
@@ -38,6 +39,7 @@ export function Session({ exercises, kind, lessonId, onExit }: Props) {
       seconds,
       xp: sessionXp({ firstTryCorrect: firstOk.current, total, seconds, kind }),
       words: [...wordResults.current].map(([id, ok]) => ({ id, ok })),
+      tags: tagResults.current,
     }
     completeSession(r)
     setSummary(r)
@@ -55,6 +57,7 @@ export function Session({ exercises, kind, lessonId, onExit }: Props) {
       if (passed) firstOk.current++
       const bad = new Set(res.badWordIds ?? [])
       for (const id of ex.wordIds) wordResults.current.set(id, passed && !bad.has(id))
+      if (ex.tag && ex.tag !== 'vocab') tagResults.current.push({ tag: ex.tag, ok: passed })
     }
     if (!passed) setQueue((q) => [...q, { ...ex, id: ex.id.replace(/-r$/, '') + '-r' }])
   }, [answer, ex, result, sound])

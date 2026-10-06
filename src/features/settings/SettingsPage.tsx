@@ -3,15 +3,15 @@ import { useProgress } from '../../stores/progress'
 import { Btn, Card } from '../../components/ui'
 import { useAuth } from '../auth/AuthProvider'
 
-export const APP_VERSION = '0.2.0'
+export const APP_VERSION = '0.3.0'
 
 export function SettingsPage() {
   const { settings, setSettings, goalMin, setGoal, resetAll } = useProgress()
   const { user, enabled, signOut } = useAuth()
 
   function exportData() {
-    const { xp, activity, lessons, words, goalMin, settings, perfectLessons } = useProgress.getState()
-    const blob = new Blob([JSON.stringify({ xp, activity, lessons, words, goalMin, settings, perfectLessons }, null, 2)], { type: 'application/json' })
+    const { xp, activity, lessons, words, tags, goalMin, settings, perfectLessons } = useProgress.getState()
+    const blob = new Blob([JSON.stringify({ xp, activity, lessons, words, tags, goalMin, settings, perfectLessons }, null, 2)], { type: 'application/json' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
     a.download = 'bolgarski-progress.json'

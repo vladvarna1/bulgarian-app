@@ -31,6 +31,23 @@ export function LessonPage() {
         {lesson.icon} {lesson.title_ru}
       </h1>
 
+      {lesson.rule && (
+        <div className="mt-5 rounded-3xl border-2 border-sky bg-sky/5 p-4">
+          <p className="mb-1 text-sm font-extrabold uppercase tracking-wide text-sky">Правило</p>
+          <p className="text-lg font-extrabold">{lesson.rule.title}</p>
+          <p className="mt-1">{lesson.rule.body}</p>
+          <ul className="mt-3 space-y-2">
+            {lesson.rule.examples.map((e) => (
+              <li key={e.good} className="rounded-2xl bg-white p-3 dark:bg-[#1b2a31]">
+                {e.bad && <p className="font-bold text-danger line-through decoration-2">✕ {e.bad}</p>}
+                <p className="font-bold text-[#2d6a00] dark:text-[#8ee05a]">✓ {e.good}</p>
+                {e.note && <p className="mt-1 text-sm opacity-80">{e.note}</p>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {lesson.culture && (
         <div className="mt-5 rounded-3xl border-2 border-amber-300 bg-amber-50 p-4 text-sm dark:border-amber-700 dark:bg-[#3b2a0a]">
           <p className="mb-1 font-extrabold">🌍 Культурная заметка</p>
@@ -38,7 +55,7 @@ export function LessonPage() {
         </div>
       )}
 
-      <h2 className="mb-2 mt-6 text-lg font-extrabold">Новые слова</h2>
+      {words.length > 0 && <h2 className="mb-2 mt-6 text-lg font-extrabold">Новые слова</h2>}
       <ul className="space-y-2">
         {words.map((w) => (
           <li key={w.id} className="rounded-2xl border-2 p-3 dark:border-slate-700">
