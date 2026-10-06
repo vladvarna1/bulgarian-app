@@ -1,0 +1,35 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-brand: #58cc02;
+  --color-brand-dark: #46a302;
+  --color-ink: #3c3c3c;
+  --color-sky: #1cb0f6;
+  --color-danger: #ea2b2b;
+}
+
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  background: #fff;
+  color: var(--color-ink);
+  padding-top: env(safe-area-inset-top);
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #131f24;
+    color: #e5e5e5;
+  }
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 3px solid var(--color-sky);
+  outline-offset: 2px;
+}
